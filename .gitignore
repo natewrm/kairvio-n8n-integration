@@ -1,0 +1,19 @@
+# Dependencies
+node_modules/
+
+# Secrets / environment
+.env
+.env.*
+*.pem
+*.key
+
+# Logs
+*.log
+npm-debug.log*
+
+# OS / editor cruft
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+*.swp

@@ -1,0 +1,97 @@
+{
+  "name": "Kairvio — Outbound Event (Kairvio → enrich → Slack)",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "kairvio-events",
+        "responseMode": "onReceived",
+        "options": {}
+      },
+      "id": "44444444-4444-4444-8444-444444444444",
+      "name": "Kairvio Event (Webhook)",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [200, 320],
+      "webhookId": "kairvio-events"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": { "caseSensitive": true, "leftValue": "", "typeValidation": "loose", "version": 2 },
+          "conditions": [
+            {
+              "id": "cond1",
+              "leftValue": "={{ $json.body.event }}",
+              "rightValue": "lead.created",
+              "operator": { "type": "string", "operation": "equals" }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "55555555-5555-4555-8555-555555555555",
+      "name": "Is New Lead?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [440, 320]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "s1",
+              "name": "text",
+              "value": "=:tada: *New Kairvio lead*\nName: {{ $json.body.data.customer_name || 'Unknown' }}\nPhone: {{ $json.body.data.customer_phone }}\nEmail: {{ $json.body.data.customer_email || '—' }}\nSource: {{ $json.body.data.lead_source }}\nMessage: {{ $json.body.data.message || '—' }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "66666666-6666-4666-8666-666666666666",
+      "name": "Build Slack Message",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [680, 220]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://hooks.example.com/your-slack-or-discord-webhook",
+        "sendBody": true,
+        "contentType": "json",
+        "specifyBody": "keypair",
+        "bodyParameters": {
+          "parameters": [{ "name": "text", "value": "={{ $json.text }}" }]
+        },
+        "options": {}
+      },
+      "id": "77777777-7777-4777-8777-777777777777",
+      "name": "Post to Slack",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [920, 220]
+    }
+  ],
+  "connections": {
+    "Kairvio Event (Webhook)": {
+      "main": [[{ "node": "Is New Lead?", "type": "main", "index": 0 }]]
+    },
+    "Is New Lead?": {
+      "main": [
+        [{ "node": "Build Slack Message", "type": "main", "index": 0 }],
+        []
+      ]
+    },
+    "Build Slack Message": {
+      "main": [[{ "node": "Post to Slack", "type": "main", "index": 0 }]]
+    }
+  },
+  "active": false,
+  "settings": { "executionOrder": "v1" },
+  "pinData": {},
+  "meta": { "templateCredsSetupCompleted": true }
+}
