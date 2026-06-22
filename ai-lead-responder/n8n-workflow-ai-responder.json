@@ -1,0 +1,135 @@
+{
+  "name": "Kairvio — AI Instant Lead Responder",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "kairvio-lead-ai",
+        "responseMode": "onReceived",
+        "options": {}
+      },
+      "id": "a0000000-0000-4000-8000-000000000001",
+      "name": "Kairvio Event (Webhook)",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [180, 320],
+      "webhookId": "kairvio-lead-ai"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": { "caseSensitive": true, "leftValue": "", "typeValidation": "loose", "version": 2 },
+          "conditions": [
+            {
+              "id": "cond1",
+              "leftValue": "={{ $json.body.event }}",
+              "rightValue": "lead.created",
+              "operator": { "type": "string", "operation": "equals" }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "a0000000-0000-4000-8000-000000000002",
+      "name": "Is New Lead?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [400, 320]
+    },
+    {
+      "parameters": {
+        "modelId": { "__rl": true, "value": "gpt-4o-mini", "mode": "list", "cachedResultName": "gpt-4o-mini" },
+        "messages": {
+          "values": [
+            {
+              "content": "You triage inbound leads for a local service business and draft the first reply.\n\nLead message: \"{{ $json.body.data.message }}\"\nLead name: {{ $json.body.data.customer_name || 'Unknown' }}\nSource: {{ $json.body.data.lead_source }}\n\nReturn JSON with exactly these keys:\n- intent: one short phrase (e.g. \"kitchen remodel quote\")\n- urgency: one of \"high\", \"medium\", \"low\"\n- suggested_reply: a friendly, concise SMS reply (max 320 chars) that acknowledges the request and asks one qualifying question.",
+              "role": "user"
+            }
+          ]
+        },
+        "jsonOutput": true,
+        "options": {}
+      },
+      "id": "a0000000-0000-4000-8000-000000000003",
+      "name": "AI: Triage Lead",
+      "type": "@n8n/n8n-nodes-langchain.openAi",
+      "typeVersion": 1.8,
+      "position": [640, 220],
+      "credentials": {
+        "openAiApi": { "id": "REPLACE_WITH_YOUR_OPENAI_CREDENTIAL", "name": "OpenAI account" }
+      }
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.example.com/n8n-actions",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [{ "name": "Authorization", "value": "Bearer YOUR_KAIRVIO_WEBHOOK_TOKEN" }]
+        },
+        "sendBody": true,
+        "contentType": "json",
+        "specifyBody": "keypair",
+        "bodyParameters": {
+          "parameters": [
+            { "name": "action", "value": "send_reply" },
+            { "name": "conversation_id", "value": "={{ $('Kairvio Event (Webhook)').item.json.body.data.conversation_id }}" },
+            { "name": "message", "value": "={{ $json.message.content.suggested_reply }}" },
+            { "name": "lead_status", "value": "contacted" }
+          ]
+        },
+        "options": {}
+      },
+      "id": "a0000000-0000-4000-8000-000000000004",
+      "name": "Send AI Reply via Kairvio",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [880, 220]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://hooks.example.com/your-slack-or-discord-webhook",
+        "sendBody": true,
+        "contentType": "json",
+        "specifyBody": "keypair",
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "text",
+              "value": "={{ ($('AI: Triage Lead').item.json.message.content.urgency === 'high' ? ':fire: ' : ':bell: ') }}*Lead auto-replied by AI*\nName: {{ $('Kairvio Event (Webhook)').item.json.body.data.customer_name || 'Unknown' }}\nIntent: {{ $('AI: Triage Lead').item.json.message.content.intent }}\nUrgency: {{ $('AI: Triage Lead').item.json.message.content.urgency }}\nReply sent: {{ $('AI: Triage Lead').item.json.message.content.suggested_reply }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "a0000000-0000-4000-8000-000000000005",
+      "name": "Notify Owner (Slack)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1120, 220]
+    }
+  ],
+  "connections": {
+    "Kairvio Event (Webhook)": {
+      "main": [[{ "node": "Is New Lead?", "type": "main", "index": 0 }]]
+    },
+    "Is New Lead?": {
+      "main": [
+        [{ "node": "AI: Triage Lead", "type": "main", "index": 0 }],
+        []
+      ]
+    },
+    "AI: Triage Lead": {
+      "main": [[{ "node": "Send AI Reply via Kairvio", "type": "main", "index": 0 }]]
+    },
+    "Send AI Reply via Kairvio": {
+      "main": [[{ "node": "Notify Owner (Slack)", "type": "main", "index": 0 }]]
+    }
+  },
+  "active": false,
+  "settings": { "executionOrder": "v1" },
+  "pinData": {},
+  "meta": { "templateCredsSetupCompleted": false }
+}

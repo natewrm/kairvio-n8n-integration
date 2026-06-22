@@ -52,15 +52,41 @@ existing data models), it **never throws** and is bounded by a 3s timeout (a slo
 or dead n8n can't hang or fail the originating request), and it **reuses
 Kairvio's existing event names** rather than standing up a parallel event system.
 
+## Flagship — AI Instant Lead Responder (both directions, AI in the loop)
+
+The two patterns above combine into something genuinely useful. Service
+businesses win or lose jobs on **speed-to-lead**; replying within minutes
+dramatically lifts conversion. This workflow closes that gap automatically:
+
+```
+New lead → Kairvio fires lead.created → n8n
+   → AI node reads the message, classifies intent + urgency, drafts a reply
+   → n8n calls BACK into Kairvio to send that reply as an SMS and move the
+     lead to "contacted"
+   → owner gets a Slack summary ("🔥 hot lead: kitchen remodel — reply sent")
+```
+
+This is the important leap: n8n doesn't just *observe* Kairvio events, it
+**acts** on them — true bidirectional control. The acting half is a small
+token-authed endpoint,
+[`ai-lead-responder/actions-webhook.example.js`](ai-lead-responder/actions-webhook.example.js),
+that lets a token holder reply to a conversation and advance the lead — scoped
+to the token's business, SMS rate-limited, with `lead_status` validated against
+the pipeline. The n8n side is
+[`ai-lead-responder/n8n-workflow-ai-responder.json`](ai-lead-responder/n8n-workflow-ai-responder.json).
+
 ## n8n workflows
 
-Both `.json` files import directly into any n8n instance
+All three `.json` files import directly into any n8n instance
 (*Workflows → ⋯ → Import from File*) to see the patterns in action:
 
 - [`inbound/n8n-workflow-inbound.json`](inbound/n8n-workflow-inbound.json) —
   Webhook trigger → normalize fields → HTTP Request into Kairvio.
 - [`outbound/n8n-workflow-outbound.json`](outbound/n8n-workflow-outbound.json) —
   Webhook trigger ← Kairvio → filter on event type → post to Slack.
+- [`ai-lead-responder/n8n-workflow-ai-responder.json`](ai-lead-responder/n8n-workflow-ai-responder.json) —
+  Kairvio event → AI triage → auto-reply via Kairvio → Slack the owner.
+  (Attach an OpenAI credential to the **AI: Triage Lead** node.)
 
 Set the URLs/tokens (placeholders use `example.com`) to your own instance before
 running.
